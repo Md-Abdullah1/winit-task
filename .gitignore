@@ -1,0 +1,8 @@
+# Server specific
+server/node_modules/
+server/.env
+server/.env.local
+server/.env.development
+server/.env.test
+server/.env.production
+server/config/
