@@ -21,8 +21,6 @@ app.use((req, res, next) => {
 const indexRouter = require("./routes");
 app.use("/api", indexRouter);
 
-// Quick health/ping
-app.get('/api/ping', (req, res) => res.json({ ok: true }));
 
 // Root redirect to /api
 app.get("/", (req, res) => {
