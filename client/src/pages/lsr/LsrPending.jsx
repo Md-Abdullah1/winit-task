@@ -1,6 +1,10 @@
 import { Table, Button, Tag } from 'antd'
+import { useEffect, useState } from 'react'
+import api from '../../lib/api.js'
 
 export default function LsrPending() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
   const columns = [
     { title: 'Req ID', dataIndex: 'reqId' },
     { title: 'Route', dataIndex: 'route' },
@@ -18,10 +22,33 @@ export default function LsrPending() {
     ) },
   ]
 
-  const data = [
-    { key: 'p1', reqId: 'REQ-10030', route: 'R-22', requestDate: '2025-10-04', approvalDate: '-', approvedLoad: '-', truck: '-', driver: '-', status: 'pending' },
-    { key: 'p2', reqId: 'REQ-10031', route: 'R-03', requestDate: '2025-10-05', approvalDate: '-', approvedLoad: '-', truck: '-', driver: '-', status: 'pending' },
-  ]
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      try {
+        setLoading(true)
+        const res = await api.get('/lsr/requests', { params: { status: 'submitted' } })
+        if (!ignore) {
+          const mapped = (res.data || []).map((r, idx) => ({
+            key: r._id || String(idx),
+            reqId: r._id,
+            route: r.route || '-',
+            requestDate: r.createdAt?.slice(0,10),
+            approvalDate: '-',
+            approvedLoad: '-',
+            truck: '-',
+            driver: '-',
+            status: r.status,
+          }))
+          setRows(mapped)
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
 
   return (
     <div className="space-y-3">
@@ -29,7 +56,7 @@ export default function LsrPending() {
         <div className="text-xl font-semibold text-slate-900">Pending Requests</div>
         <div className="text-slate-500">Requests submitted for approval and awaiting action.</div>
       </div>
-      <Table columns={columns} dataSource={data} pagination={false} className="bg-white" />
+      <Table loading={loading} columns={columns} dataSource={rows} pagination={false} className="bg-white" />
     </div>
   )
 }

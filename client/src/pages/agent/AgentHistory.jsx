@@ -1,7 +1,12 @@
-import { Table, Tag, Button } from 'antd'
+import { Table, Tag, Button, Segmented } from 'antd'
 import { EyeOutlined } from '@ant-design/icons'
+import { useEffect, useMemo, useState } from 'react'
+import api from '../../lib/api.js'
 
 export default function AgentHistory() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [typeFilter, setTypeFilter] = useState('All')
   const columns = [
     { title: 'Movement', dataIndex: 'movement' },
     { title: 'Salesman', dataIndex: 'salesman' },
@@ -15,10 +20,39 @@ export default function AgentHistory() {
     { title: 'Actions', key: 'action', render: () => <Button size="small" icon={<EyeOutlined />}>View</Button> },
   ]
 
-  const data = [
-    { key: 'h1', movement: 'MV-4401', salesman: 'S. Iqbal', type: 'Commercial', submitted: '2025-09-30', processed: '2025-10-01', items: 12, requested: 120, approved: 110, status: 'approved' },
-    { key: 'h2', movement: 'MV-4402', salesman: 'D. Singh', type: 'POSM', submitted: '2025-09-29', processed: '2025-09-30', items: 6, requested: 42, approved: 0, status: 'rejected' },
-  ]
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      try {
+        setLoading(true)
+        const res = await api.get('/agent/requests/history')
+        if (!ignore) {
+          const mapped = (res.data || []).map((r, idx) => ({
+            key: r._id || String(idx),
+            movement: r.movementCode || r._id?.slice(-6),
+            salesman: r.createdBy?.name || '-',
+            type: (r.items || []).some(i => i.type === 'posm') ? 'POSM' : 'Commercial',
+            submitted: r.createdAt?.slice(0,10),
+            processed: r.updatedAt?.slice(0,10),
+            items: (r.items || []).length,
+            requested: (r.items || []).reduce((a,i)=>a + (i.quantity||0),0),
+            approved: r.status === 'approved' ? (r.items || []).reduce((a,i)=>a + (i.quantity||0),0) : 0,
+            status: r.status,
+          }))
+          setRows(mapped)
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
+
+  const filteredRows = useMemo(() => {
+    if (typeFilter === 'All') return rows
+    return (rows || []).filter(r => r.type?.toLowerCase() === (typeFilter === 'POSM' ? 'posm' : 'commercial'))
+  }, [rows, typeFilter])
 
   return (
     <div className="space-y-3">
@@ -26,7 +60,15 @@ export default function AgentHistory() {
         <div className="text-xl font-semibold text-slate-900">Requests History</div>
         <div className="text-slate-500">All processed requests with outcomes.</div>
       </div>
-      <Table columns={columns} dataSource={data} pagination={false} className="bg-white" />
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-slate-600 text-sm">Filter by type</div>
+        <Segmented
+          options={[ 'Commercial', 'POSM', 'All' ]}
+          value={typeFilter}
+          onChange={setTypeFilter}
+        />
+      </div>
+      <Table loading={loading} columns={columns} dataSource={filteredRows} pagination={false} className="bg-white" />
     </div>
   )
 }

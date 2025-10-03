@@ -69,7 +69,7 @@ export default function LsrCreate() {
   }, [])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lsr-table-container">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-slate-900 font-medium">Create Load Request</div>

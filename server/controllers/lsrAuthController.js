@@ -15,7 +15,15 @@ async function register(req, res) {
 
 async function login(req, res) {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
+    console.log(email, password,'email, password');
+    if (!email || !password) return res.status(400).json({ message: "Email and password are required" });
+    // Hardcoded creds fallback
+    if (email === 'abcd@gmail.com' && password === '12345678') {
+      const token = signToken({ id: 'hardcoded-lsr', role: 'lsr' });
+      return res.json({ token, user: { id: 'hardcoded-lsr', name: 'Demo LSR', email, role: 'lsr' } });
+    }
+
     const user = await LsrUser.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
     const ok = await user.comparePassword(password);

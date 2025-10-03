@@ -1,7 +1,11 @@
 import { Table, Tag, Progress, Button } from 'antd'
 import { EyeOutlined, DownloadOutlined } from '@ant-design/icons'
+import { useEffect, useState } from 'react'
+import api from '../../lib/api.js'
 
 export default function AgentApproved() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
   const columns = [
     { title: 'Reqs ID', dataIndex: 'reqId' },
     { title: 'Route', dataIndex: 'route' },
@@ -25,11 +29,34 @@ export default function AgentApproved() {
     ) },
   ]
 
-  const data = [
-    { key: 'a1', reqId: 'REQ-11001', route: 'R-12', requestedBy: 'LSR-12', depot: 'D01', approvalDate: '2025-10-03', load: '120 CASE', resource: 'TR-110', status: 'in_transit', progress: 45 },
-    { key: 'a2', reqId: 'REQ-11002', route: 'R-08', requestedBy: 'LSR-03', depot: 'D02', approvalDate: '2025-10-04', load: '85 CASE', resource: 'TR-220', status: 'delivered', progress: 100 },
-    { key: 'a3', reqId: 'REQ-11003', route: 'R-20', requestedBy: 'LSR-09', depot: 'D03', approvalDate: '2025-10-04', load: '60 CASE', resource: 'TR-305', status: 'load_sheet_generated', progress: 20 },
-  ]
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      try {
+        setLoading(true)
+        const res = await api.get('/agent/requests/approved')
+        if (!ignore) {
+          const mapped = (res.data || []).map((r, idx) => ({
+            key: r._id || String(idx),
+            reqId: r._id,
+            route: r.route || '-',
+            requestedBy: r.createdBy?.name || '-',
+            depot: r.depot || '-',
+            approvalDate: r.updatedAt?.slice(0,10),
+            load: `${(r.items || []).reduce((a,i)=>a + (i.quantity||0),0)} ITEM`,
+            resource: r.truck || '-',
+            status: r.fulfillmentStatus === 'shipped' ? 'delivered' : (r.fulfillmentStatus || 'load_sheet_generated'),
+            progress: r.fulfillmentStatus === 'shipped' ? 100 : (r.fulfillmentStatus === 'logistics' ? 30 : 60),
+          }))
+          setRows(mapped)
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
 
   return (
     <div className="space-y-3">
@@ -37,7 +64,7 @@ export default function AgentApproved() {
         <div className="text-xl font-semibold text-slate-900">Approved Requests</div>
         <div className="text-slate-500">Approved load requests and their fulfillment progress.</div>
       </div>
-      <Table columns={columns} dataSource={data} pagination={false} className="bg-white" />
+      <Table loading={loading} columns={columns} dataSource={rows} pagination={false} className="bg-white" />
     </div>
   )
 }

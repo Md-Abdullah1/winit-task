@@ -1,6 +1,10 @@
 import { Table, Button, Tag } from 'antd'
+import { useEffect, useState } from 'react'
+import api from '../../lib/api.js'
 
 export default function LsrApproved() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
   const columns = [
     { title: 'Req ID', dataIndex: 'reqId' },
     { title: 'Route', dataIndex: 'route' },
@@ -26,11 +30,33 @@ export default function LsrApproved() {
     ) },
   ]
 
-  const data = [
-    { key: '1', reqId: 'REQ-10021', route: 'R-12', requestDate: '2025-10-01', approvalDate: '2025-10-02', approvedLoad: '120 CASE', truck: 'TR-9082', driver: 'John D', status: 'delivered' },
-    { key: '2', reqId: 'REQ-10022', route: 'R-18', requestDate: '2025-10-03', approvalDate: '2025-10-03', approvedLoad: '80 CASE', truck: 'TR-7765', driver: 'A. Khan', status: 'in_transit' },
-    { key: '3', reqId: 'REQ-10023', route: 'R-05', requestDate: '2025-10-04', approvalDate: '2025-10-04', approvedLoad: '65 CASE', truck: 'TR-3344', driver: 'M. Chen', status: 'load_sheet_generated' },
-  ]
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      try {
+        setLoading(true)
+        const res = await api.get('/lsr/requests', { params: { status: 'approved' } })
+        if (!ignore) {
+          const mapped = (res.data || []).map((r, idx) => ({
+            key: r._id || String(idx),
+            reqId: r._id,
+            route: r.route || '-',
+            requestDate: r.createdAt?.slice(0,10),
+            approvalDate: r.updatedAt?.slice(0,10),
+            approvedLoad: `${(r.items || []).reduce((a,i)=>a + (i.quantity||0),0)} ITEM`,
+            truck: r.truck || '-',
+            driver: r.driver || '-',
+            status: r.fulfillmentStatus === 'shipped' ? 'delivered' : (r.fulfillmentStatus || 'load_sheet_generated'),
+          }))
+          setRows(mapped)
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
 
   return (
     <div className="space-y-3">
@@ -38,7 +64,7 @@ export default function LsrApproved() {
         <div className="text-xl font-semibold text-slate-900">Approved Requests</div>
         <div className="text-slate-500">List of requests that have been approved and their delivery status.</div>
       </div>
-      <Table columns={columns} dataSource={data} pagination={false} className="bg-white" />
+      <Table loading={loading} columns={columns} dataSource={rows} pagination={false} className="bg-white" />
     </div>
   )
 }

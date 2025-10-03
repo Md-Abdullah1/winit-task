@@ -1,4 +1,7 @@
 const Request = require("../models/Request");
+const mongoose = require("mongoose");
+
+const DUMMY_AGENT_ID = new mongoose.Types.ObjectId("64c64c64c64c64c64c64c64c");
 
 async function listPending(req, res) {
   const { status } = req.query; // optional fulfillmentStatus filter
@@ -13,7 +16,7 @@ async function approve(req, res) {
   const request = await Request.findOne({ _id: requestId, status: "submitted" });
   if (!request) return res.status(404).json({ message: "Request not found or not submitted" });
   request.status = "approved";
-  request.approvedBy = req.user.id;
+  request.approvedBy = mongoose.Types.ObjectId.isValid(req?.user?.id) ? req.user.id : DUMMY_AGENT_ID;
   request.rejectionReason = undefined;
   await request.save();
   res.json(request);
@@ -41,6 +44,51 @@ async function listHistory(req, res) {
   res.json(requests);
 }
 
-module.exports = { listPending, approve, reject, listApproved, listHistory };
+// Return flattened pending items from submitted requests for item-level review
+async function listPendingItems(req, res) {
+  const requests = await Request.find({ status: "submitted" }).sort({ createdAt: -1 }).populate("createdBy", "name email");
+  const items = [];
+  for (const request of requests) {
+    for (const item of request.items || []) {
+      items.push({
+        id: `${request._id}:${item.name}`,
+        requestId: String(request._id),
+        sku: item.name,
+        name: item.name,
+        lsr: request.createdBy?.name || "",
+        requested: item.quantity,
+        stock: null,
+        approved: item.quantity,
+        priority: request.priority || "normal",
+        customer: "",
+      });
+    }
+  }
+  res.json(items);
+}
+
+// Assign logistics resources to an approved request
+async function assign(req, res) {
+  const { requestId } = req.params;
+  const { truckId, driverId } = req.body || {};
+  const request = await Request.findOne({ _id: requestId, status: "approved" });
+  if (!request) return res.status(404).json({ message: "Request not found or not approved" });
+  // Minimal fields here: record assignment in fulfillmentStatus stage
+  request.fulfillmentStatus = "logistics";
+  await request.save();
+  res.json({ ok: true, requestId, truckId, driverId });
+}
+
+// Generate load sheet and advance fulfillment status
+async function generateLoadSheet(req, res) {
+  const { requestId } = req.params;
+  const request = await Request.findOne({ _id: requestId, status: "approved" });
+  if (!request) return res.status(404).json({ message: "Request not found or not approved" });
+  request.fulfillmentStatus = "forklift";
+  await request.save();
+  res.json({ ok: true });
+}
+
+module.exports = { listPending, approve, reject, listApproved, listHistory, listPendingItems, assign, generateLoadSheet };
 
 

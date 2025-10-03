@@ -1,16 +1,31 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, DatePicker, Input, Segmented, Table, Tag } from 'antd'
+import api from '../../lib/api.js'
 
 export default function AgentPending() {
   const [productType, setProductType] = useState('Commercial Products')
   const [date, setDate] = useState()
   const [search, setSearch] = useState('')
 
-  const data = useMemo(() => [
-    { key: 'r1', sku: 'COLA-330', name: 'Cola 330ml', lsr: 'Van-12', requested: 120, stock: 80, approved: 100, priority: 'emergency', customer: 'Store A' },
-    { key: 'r2', sku: 'ORNG-500', name: 'Orange 500ml', lsr: 'Van-03', requested: 60, stock: 150, approved: 60, priority: 'normal', customer: 'Store B' },
-    { key: 'r3', sku: 'STND-POST', name: 'Standard Poster', lsr: 'Van-08', requested: 30, stock: 500, approved: 25, priority: 'normal', customer: 'Outlet C' },
-  ].filter(r => !search || r.sku.toLowerCase().includes(search.toLowerCase()) || r.name.toLowerCase().includes(search.toLowerCase())), [search])
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      try {
+        setLoading(true)
+        const res = await api.get('/agent/requests/items', { params: { status: 'pending' } })
+        if (!ignore) setRows(res.data || [])
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
+
+  const data = useMemo(() => (rows || []).filter(r => !search || (r.sku || '').toLowerCase().includes(search.toLowerCase()) || (r.name || '').toLowerCase().includes(search.toLowerCase())), [rows, search])
 
   const totals = useMemo(() => data.reduce((acc, r) => {
     acc.items += 1
@@ -68,6 +83,7 @@ export default function AgentPending() {
       </div>
 
       <Table
+        loading={loading}
         columns={columns}
         dataSource={data}
         pagination={false}
