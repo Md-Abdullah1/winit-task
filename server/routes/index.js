@@ -6,6 +6,7 @@ const router = express.Router();
 const lsrRouter = require("./lsr");
 const agentRouter = require("./agent");
 const ordersRouter = require("./orders");
+const productsRouter = require("./products");
 
 // GET /api -> simple message
 router.get("/", (req, res) => {
@@ -16,5 +17,6 @@ router.get("/", (req, res) => {
 router.use("/lsr", lsrRouter);
 router.use("/agent", agentRouter);
 router.use("/orders", ordersRouter);
+router.use("/products", productsRouter);
 
 module.exports = router;

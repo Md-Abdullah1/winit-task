@@ -9,6 +9,63 @@ function resolveUserObjectId(req) {
   return DUMMY_LSR_ID;
 }
 
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function toNonNegativeNumber(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
+function validateAndNormalizeItem(body = {}) {
+  const { type } = body;
+  if (!isNonEmptyString(type) || !["commercial", "posm"].includes(type)) {
+    return { ok: false, error: "Invalid type" };
+  }
+
+  const sku = body.sku;
+  const name = body.name;
+  if (!isNonEmptyString(sku) || !isNonEmptyString(name)) {
+    return { ok: false, error: "Missing sku or name" };
+  }
+
+  const orderQty = Number(body.orderQty);
+  if (!Number.isFinite(orderQty) || orderQty < 1) {
+    return { ok: false, error: "Invalid orderQty" };
+  }
+
+  const payload = {
+    sku,
+    name,
+    category: isNonEmptyString(body.category) ? body.category : undefined,
+    brand: isNonEmptyString(body.brand) ? body.brand : undefined,
+    uom: isNonEmptyString(body.uom) ? body.uom : undefined,
+    pack: isNonEmptyString(body.pack) ? body.pack : undefined,
+    mrp: body.mrp !== undefined ? body.mrp : undefined,
+    stock: toNonNegativeNumber(body.stock, undefined),
+    reserved: toNonNegativeNumber(body.reserved, undefined),
+    available: toNonNegativeNumber(body.available, undefined),
+    avg: toNonNegativeNumber(body.avg, undefined),
+    customer: isNonEmptyString(body.customer) ? body.customer : undefined,
+    requested: toNonNegativeNumber(body.requested ?? orderQty),
+    approved: toNonNegativeNumber(body.approved ?? orderQty),
+  };
+
+  // Remove undefined keys for cleanliness
+  Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+
+  const item = {
+    type,
+    name,
+    quantity: orderQty,
+    notes: isNonEmptyString(body.notes) ? body.notes : undefined,
+    payload: { ...payload, orderQty },
+  };
+  return { ok: true, item };
+}
+
 async function listMyRequests(req, res) {
   try {
     const { status } = req.query;
@@ -33,11 +90,12 @@ async function createRequest(req, res) {
 async function addItem(req, res) {
   try {
     const { requestId } = req.params;
-    const { type, name, quantity, notes } = req.body;
+    const validation = validateAndNormalizeItem(req.body);
+    if (!validation.ok) return res.status(400).json({ message: validation.error });
     const request = await Request.findOne({ _id: requestId, createdBy: resolveUserObjectId(req) });
     if (!request) return res.status(404).json({ message: "Request not found" });
     if (request.status !== "draft") return res.status(400).json({ message: "Cannot add items unless draft" });
-    request.items.push({ type, name, quantity, notes });
+    request.items.push(validation.item);
     await request.save();
     res.json(request);
   } catch (err) {
