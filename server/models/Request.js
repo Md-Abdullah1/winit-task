@@ -5,7 +5,9 @@ const itemSchema = new mongoose.Schema(
     type: { type: String, enum: ["commercial", "posm"], required: true },
     name: { type: String, required: true },
     quantity: { type: Number, required: true, min: 1 },
-    notes: { type: String }
+    notes: { type: String },
+    // Store the full incoming item payload for UI tables
+    payload: { type: mongoose.Schema.Types.Mixed }
   },
   { _id: false }
 );
