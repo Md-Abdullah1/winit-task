@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Form, Input, message } from 'antd'
 import api from '../../../lib/api.js'
 import { useAuth } from '../../../context/AuthContext.jsx'
@@ -6,8 +6,14 @@ import { useNavigate, Link } from 'react-router-dom'
 
 export default function AgentLogin() {
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, isAuthenticated, role } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(role === 'lsr' ? '/dashboard/lsr' : '/dashboard/agent', { replace: true })
+    }
+  }, [isAuthenticated, role, navigate])
 
   async function onFinish(values) {
     try {
