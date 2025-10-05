@@ -1,11 +1,16 @@
-import { MenuFoldOutlined, BellOutlined, ReloadOutlined, BulbOutlined } from '@ant-design/icons'
-import { Input } from 'antd'
+import { MenuFoldOutlined, BellOutlined, ReloadOutlined, BulbOutlined, LogoutOutlined } from '@ant-design/icons'
+import { Input, Button } from 'antd'
 import { useTheme } from '../../context/ThemeContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { useNavigate } from 'react-router-dom'
 
 export default function Header({ onToggleSidebar }) {
   const { theme, toggle } = useTheme()
+  const isDark = theme === 'dark'
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   return (
-    <header className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white">
+    <header className={`h-14 border-b flex items-center justify-between px-4 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
       <div className="flex items-center gap-3">
         <button onClick={onToggleSidebar} className="text-xl">
           <MenuFoldOutlined />
@@ -15,12 +20,17 @@ export default function Header({ onToggleSidebar }) {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <BellOutlined className="text-lg" />
-        <button onClick={toggle} title="Toggle theme" className="text-lg">
+        <BellOutlined className={`text-lg ${isDark ? 'text-slate-300' : ''}`} />
+        <button onClick={toggle} title="Toggle theme" className={`text-lg ${isDark ? 'text-slate-300' : ''}`}>
           <BulbOutlined />
         </button>
         <ReloadOutlined className="text-lg" />
-        <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs text-slate-700">Admin</div>
+        <Button
+          size="small"
+          icon={<LogoutOutlined />}
+          onClick={() => { logout(); navigate('/login/agent', { replace: true }) }}
+        >Logout</Button>
+        <div className={`h-8 w-8 rounded-full grid place-items-center text-xs ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>Admin</div>
       </div>
     </header>
   )

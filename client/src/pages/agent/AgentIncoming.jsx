@@ -35,7 +35,7 @@ export default function AgentIncoming() {
       try {
         setLoading(true)
         const res = await api.get('/agent/requests/pending', { params: { status: status === 'all' ? undefined : status } })
-        if (!ignore) setRows((res.data || []).map((r, idx) => ({ key: r.id || String(idx), movement: r.movementCode, route: r.route, salesman: r.salesmanName, type: r.type, status: r.status, submitted: r.submittedAt?.slice(0,10) })))
+        if (!ignore) setRows((res.data || []).map((r, idx) => ({ key: r.id || String(idx), movement: r.movementCode || 'not specified', route: r.route || 'not specified', salesman: r.salesmanName || 'not specified', type: r.type || 'not specified', status: r.status, submitted: r.submittedAt?.slice(0,10) })))
       } catch {
         // fallback demo data
         const demo = [

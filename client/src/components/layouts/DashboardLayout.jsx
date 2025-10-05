@@ -13,7 +13,7 @@ export default function DashboardLayout() {
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(o => !o)} />
       <div className="flex-1 flex flex-col">
         <Header onToggleSidebar={() => setSidebarOpen(o => !o)} />
-        <main className="p-4">
+        <main className={`p-4 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'}`}>
           <Outlet />
         </main>
       </div>

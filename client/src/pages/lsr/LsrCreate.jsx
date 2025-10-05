@@ -1,57 +1,52 @@
 import { useEffect, useMemo, useState } from 'react'
-import { DatePicker, Segmented, Table, Button, Modal, Input, message } from 'antd'
+import { DatePicker, Segmented, Table, Button, Modal, Input, message, Form } from 'antd'
 import { ShoppingCartOutlined, AppstoreOutlined, CloseOutlined, ExclamationCircleFilled, ScheduleOutlined } from '@ant-design/icons'
 import api from '../../lib/api.js'
-
-const initialRows = [
-  { key: '1', sku: 'COLA-330', name: 'Cola 330ml', defaultUom: 'CASE', recommended: 10, preOrder: 0, buffer: 2 },
-  { key: '2', sku: 'ORNG-500', name: 'Orange 500ml', defaultUom: 'CASE', recommended: 6, preOrder: 0, buffer: 1 },
-]
 
 export default function LsrCreate() {
   const [date, setDate] = useState()
   const [tab, setTab] = useState('Commercial Items')
-  const [rows, setRows] = useState(initialRows)
-  const [posmRows, setPosmRows] = useState([
-    { key: 'p1', sku: 'STND-POST', name: 'Standard Poster', defaultUom: 'PCS', recommended: 20, preOrder: 0, buffer: 5 },
-    { key: 'p2', sku: 'CT-STD', name: 'Counter Tent', defaultUom: 'PCS', recommended: 10, preOrder: 0, buffer: 2 },
-  ])
+  const [products, setProducts] = useState([])
+  const [loadingProducts, setLoadingProducts] = useState(false)
   const [showCommercialModal, setShowCommercialModal] = useState(false)
   const [showPosmModal, setShowPosmModal] = useState(false)
   const [showPriorityModal, setShowPriorityModal] = useState(false)
+  const [showAddProduct, setShowAddProduct] = useState(false)
   const [requestId, setRequestId] = useState(null)
 
-  const columns = useMemo(() => [
+  const productColumns = useMemo(() => [
     { title: 'SKU', dataIndex: 'sku' },
     { title: 'Product Name', dataIndex: 'name' },
-    { title: 'UOM', dataIndex: 'defaultUom' },
-    { title: 'Recommended', dataIndex: 'recommended' },
-    { title: 'Pre-Order', dataIndex: 'preOrder', render: (_, r, i) => (
-      <Input
-        size="small"
-        type="number"
-        value={r.preOrder}
-        onChange={(e) => updateRow(i, { preOrder: Number(e.target.value || 0) })}
-        className="w-20"
-      />
-    ) },
-    { title: 'Buffer', dataIndex: 'buffer', render: (_, r, i) => (
-      <Input
-        size="small"
-        type="number"
-        value={r.buffer}
-        onChange={(e) => updateRow(i, { buffer: Number(e.target.value || 0) })}
-        className="w-20"
-      />
-    ) },
-    { title: 'Total Qty', dataIndex: 'total', render: (_, r) => r.recommended + r.preOrder + r.buffer },
-  ], [rows])
+    { title: 'UOM', dataIndex: 'uom' },
+    { title: 'Pack', dataIndex: 'pack' },
+    { title: 'MRP', dataIndex: 'mrp' },
+    { title: 'Stock', dataIndex: 'stock' },
+    { title: 'Reserved', dataIndex: 'reserved' },
+    { title: 'Available', dataIndex: 'available' },
+    { title: 'Avg Sales/Day', dataIndex: 'avg' },
+  ], [])
 
-  function updateRow(index, changes) {
-    if (tab === 'POSM') {
-      setPosmRows(prev => prev.map((r, i) => i === index ? { ...r, ...changes } : r))
-    } else {
-      setRows(prev => prev.map((r, i) => i === index ? { ...r, ...changes } : r))
+  async function loadProducts() {
+    try {
+      setLoadingProducts(true)
+      const res = await api.get('/products')
+      const list = (res.data || []).map((p, idx) => ({
+        key: p._id || String(idx),
+        sku: p.sku,
+        name: p.name,
+        category: p.category,
+        brand: p.brand,
+        uom: p.uom,
+        pack: p.pack,
+        mrp: p.mrp,
+        stock: p.stock,
+        reserved: p.reserved,
+        available: p.available,
+        avg: p.avg,
+      }))
+      setProducts(list)
+    } finally {
+      setLoadingProducts(false)
     }
   }
 
@@ -66,6 +61,10 @@ export default function LsrCreate() {
     }
     ensureDraft()
     return () => { ignore = true }
+  }, [])
+
+  useEffect(() => {
+    loadProducts()
   }, [])
 
   return (
@@ -84,9 +83,21 @@ export default function LsrCreate() {
           value={tab}
           onChange={setTab}
         />
+        <div className="ml-auto flex items-center gap-2">
+          <Button onClick={() => setShowAddProduct(true)}>Add Product</Button>
+        </div>
       </div>
 
-      <Table columns={columns} dataSource={tab === 'POSM' ? posmRows : rows} pagination={false} size="small" className="bg-white" />
+      {products?.length ? (
+        <div className="overflow-x-auto">
+          <Table columns={productColumns} loading={loadingProducts} dataSource={products} pagination={false} size="small" className="bg-white" />
+        </div>
+      ) : (
+        <div className="bg-white border rounded p-4 text-center">
+          <div className="text-slate-600 mb-2">No products found</div>
+          <Button type="primary" onClick={() => setShowAddProduct(true)}>Add Product</Button>
+        </div>
+      )}
 
       {tab === 'POSM' ? (
         <div className="flex items-center gap-2">
@@ -100,16 +111,19 @@ export default function LsrCreate() {
         </div>
       )}
 
-      <AddCommercialModal requestId={requestId} open={showCommercialModal} onClose={() => setShowCommercialModal(false)} />
-      <AddPosmModal requestId={requestId} open={showPosmModal} onClose={() => setShowPosmModal(false)} onAdded={() => { setShowPosmModal(false); setShowPriorityModal(true) }} />
+      <AddCommercialModal products={products} requestId={requestId} open={showCommercialModal} onClose={() => setShowCommercialModal(false)} />
+      <AddPosmModal products={products} requestId={requestId} open={showPosmModal} onClose={() => setShowPosmModal(false)} onAdded={() => { setShowPosmModal(false); setShowPriorityModal(true) }} />
       <PriorityModal requestId={requestId} onClose={() => setShowPriorityModal(false)} onSubmitted={() => { setShowPriorityModal(false); message.success('Request submitted'); }} open={showPriorityModal} />
+      <AddProductModal open={showAddProduct} onClose={() => setShowAddProduct(false)} onCreated={async () => { await loadProducts(); setShowAddProduct(false) }} />
     </div>
   )
 }
 
-function AddCommercialModal({ open, onClose, requestId }) {
+function AddCommercialModal({ open, onClose, requestId, products }) {
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [search, setSearch] = useState('')
+  const [customer, setCustomer] = useState('')
+  const [qtyByKey, setQtyByKey] = useState({})
   const columns = [
     { title: 'SKU Code', dataIndex: 'sku' },
     { title: 'Product Name', dataIndex: 'name' },
@@ -122,13 +136,18 @@ function AddCommercialModal({ open, onClose, requestId }) {
     { title: 'Reserved', dataIndex: 'reserved' },
     { title: 'Available', dataIndex: 'available' },
     { title: 'Avg Sales/Day', dataIndex: 'avg' },
-    { title: 'Order Qty', dataIndex: 'qty', render: () => <Input size="small" type="number" className="w-20" /> },
+    { title: 'Order Qty', dataIndex: 'qty', render: (_, r) => (
+      <Input
+        size="small"
+        type="number"
+        className="w-20"
+        value={qtyByKey[r.key] ?? 1}
+        onChange={(e) => setQtyByKey(prev => ({ ...prev, [r.key]: Number(e.target.value || 1) }))}
+      />
+    ) },
   ]
 
-  const data = useMemo(() => [
-    { key: '1', sku: 'COLA-330', name: 'Cola 330ml', category: 'Beverage', brand: 'Brand A', uom: 'CASE', pack: '24x330', mrp: 480, stock: 50, reserved: 5, available: 45, avg: 12 },
-    { key: '2', sku: 'ORNG-500', name: 'Orange 500ml', category: 'Beverage', brand: 'Brand B', uom: 'CASE', pack: '12x500', mrp: 360, stock: 20, reserved: 2, available: 18, avg: 7 },
-  ].filter(r => !search || r.sku.toLowerCase().includes(search.toLowerCase()) || r.name.toLowerCase().includes(search.toLowerCase())), [search])
+  const dataPosm = useMemo(() => (products || []).filter(r => !search || (r.sku || '').toLowerCase().includes(search.toLowerCase()) || (r.name || '').toLowerCase().includes(search.toLowerCase())), [products, search])
 
   return (
     <Modal
@@ -147,14 +166,17 @@ function AddCommercialModal({ open, onClose, requestId }) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <Input placeholder="Search by SKU or Product Name" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Customer (optional)" value={customer} onChange={e => setCustomer(e.target.value)} />
         </div>
-        <Table
-          rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-          columns={columns}
-          dataSource={data}
-          size="small"
-          scroll={{ x: true }}
-        />
+        <div className="overflow-x-auto">
+          <Table
+            rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+            columns={columns}
+            dataSource={dataPosm}
+            size="small"
+            scroll={{ x: true }}
+          />
+        </div>
         <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-slate-600">Items selected: {selectedRowKeys.length} | Quantity: - | Amount: -</div>
           <div className="flex items-center gap-2">
@@ -165,8 +187,23 @@ function AddCommercialModal({ open, onClose, requestId }) {
               onClick={async () => {
                 try {
                   if (!requestId) return;
-                  // Demo: push selected items as commercial
-                  await Promise.all(selectedRowKeys.map((key) => api.post(`/lsr/requests/${requestId}/items`, { type: 'commercial', name: key, quantity: 1 })))
+                  const selected = dataPosm.filter(d => selectedRowKeys.includes(d.key))
+                  await Promise.all(selected.map((row) => api.post(`/lsr/requests/${requestId}/items`, {
+                    type: 'commercial',
+                    sku: row.sku,
+                    name: row.name,
+                    category: row.category,
+                    brand: row.brand,
+                    uom: row.uom,
+                    pack: row.pack,
+                    mrp: row.mrp,
+                    stock: row.stock,
+                    reserved: row.reserved,
+                    available: row.available,
+                    avg: row.avg,
+                    orderQty: qtyByKey[row.key] ?? 1,
+                    customer: customer || undefined,
+                  })))
                   onClose()
                 } catch {}
               }}
@@ -180,9 +217,11 @@ function AddCommercialModal({ open, onClose, requestId }) {
   )
 }
 
-function AddPosmModal({ open, onClose, onAdded, requestId }) {
+function AddPosmModal({ open, onClose, onAdded, requestId, products }) {
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [search, setSearch] = useState('')
+  const [customer, setCustomer] = useState('')
+  const [qtyByKey, setQtyByKey] = useState({})
   const columns = [
     { title: 'SKU Code', dataIndex: 'sku' },
     { title: 'Product Name', dataIndex: 'name' },
@@ -195,13 +234,18 @@ function AddPosmModal({ open, onClose, onAdded, requestId }) {
     { title: 'Reserved', dataIndex: 'reserved' },
     { title: 'Available', dataIndex: 'available' },
     { title: 'Avg Sales/Day', dataIndex: 'avg' },
-    { title: 'Order Qty', dataIndex: 'qty', render: () => <Input size="small" type="number" className="w-20" /> },
+    { title: 'Order Qty', dataIndex: 'qty', render: (_, r) => (
+      <Input
+        size="small"
+        type="number"
+        className="w-20"
+        value={qtyByKey[r.key] ?? 1}
+        onChange={(e) => setQtyByKey(prev => ({ ...prev, [r.key]: Number(e.target.value || 1) }))}
+      />
+    ) },
   ]
 
-  const data = useMemo(() => [
-    { key: '1', sku: 'STND-POST', name: 'Standard Poster', category: 'POSM', brand: 'Brand X', uom: 'PCS', pack: '-', mrp: '-', stock: 200, reserved: 20, available: 180, avg: 30 },
-    { key: '2', sku: 'CT-STD', name: 'Counter Tent', category: 'POSM', brand: 'Brand Y', uom: 'PCS', pack: '-', mrp: '-', stock: 40, reserved: 5, available: 35, avg: 6 },
-  ].filter(r => !search || r.sku.toLowerCase().includes(search.toLowerCase()) || r.name.toLowerCase().includes(search.toLowerCase())), [search])
+  const data = useMemo(() => (products || []).filter(r => !search || (r.sku || '').toLowerCase().includes(search.toLowerCase()) || (r.name || '').toLowerCase().includes(search.toLowerCase())), [products, search])
 
   return (
     <Modal
@@ -220,14 +264,17 @@ function AddPosmModal({ open, onClose, onAdded, requestId }) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <Input placeholder="Search by SKU or Product Name" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Customer (optional)" value={customer} onChange={e => setCustomer(e.target.value)} />
         </div>
-        <Table
-          rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-          columns={columns}
-          dataSource={data}
-          size="small"
-          scroll={{ x: true }}
-        />
+        <div className="overflow-x-auto">
+          <Table
+            rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+            columns={columns}
+            dataSource={data}
+            size="small"
+            scroll={{ x: true }}
+          />
+        </div>
         <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-slate-600">Items selected: {selectedRowKeys.length} | Quantity: - | Amount: -</div>
           <div className="flex items-center gap-2">
@@ -238,7 +285,23 @@ function AddPosmModal({ open, onClose, onAdded, requestId }) {
               onClick={async () => {
                 try {
                   if (!requestId) return;
-                  await Promise.all(selectedRowKeys.map((key) => api.post(`/lsr/requests/${requestId}/items`, { type: 'posm', name: key, quantity: 1 })))
+                  const selected = data.filter(d => selectedRowKeys.includes(d.key))
+                  await Promise.all(selected.map((row) => api.post(`/lsr/requests/${requestId}/items`, {
+                    type: 'posm',
+                    sku: row.sku,
+                    name: row.name,
+                    category: row.category,
+                    brand: row.brand,
+                    uom: row.uom,
+                    pack: row.pack,
+                    mrp: row.mrp,
+                    stock: row.stock,
+                    reserved: row.reserved,
+                    available: row.available,
+                    avg: row.avg,
+                    orderQty: qtyByKey[row.key] ?? 1,
+                    customer: customer || undefined,
+                  })))
                 } catch {}
                 onAdded()
               }}
@@ -304,4 +367,62 @@ function PriorityModal({ open, onClose, requestId, onSubmitted }) {
   )
 }
 
+
+function AddProductModal({ open, onClose, onCreated }) {
+  const [form] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
+  async function handleSubmit() {
+    try {
+      const values = await form.validateFields()
+      setSubmitting(true)
+      await api.post('/products', values)
+      message.success('Product created')
+      onCreated?.()
+    } catch {
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  return (
+    <Modal open={open} onCancel={onClose} onOk={handleSubmit} okButtonProps={{ loading: submitting }} title="Add Product">
+      <Form form={form} layout="vertical">
+        <Form.Item name="sku" label="SKU" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="name" label="Product Name" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Form.Item name="category" label="Category">
+            <Input />
+          </Form.Item>
+          <Form.Item name="brand" label="Brand">
+            <Input />
+          </Form.Item>
+          <Form.Item name="uom" label="UOM">
+            <Input />
+          </Form.Item>
+          <Form.Item name="pack" label="Pack">
+            <Input />
+          </Form.Item>
+          <Form.Item name="mrp" label="MRP">
+            <Input type="number" />
+          </Form.Item>
+          <Form.Item name="stock" label="Stock">
+            <Input type="number" />
+          </Form.Item>
+          <Form.Item name="reserved" label="Reserved">
+            <Input type="number" />
+          </Form.Item>
+          <Form.Item name="available" label="Available">
+            <Input type="number" />
+          </Form.Item>
+          <Form.Item name="avg" label="Avg Sales/Day">
+            <Input type="number" />
+          </Form.Item>
+        </div>
+      </Form>
+    </Modal>
+  )
+}
 
