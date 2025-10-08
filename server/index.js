@@ -11,12 +11,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Basic request logger to verify traffic reaches the server
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  next();
-});
-
 // Routes
 const indexRouter = require("./routes");
 app.use("/api", indexRouter);
