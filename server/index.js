@@ -15,13 +15,6 @@ app.use(express.urlencoded({ extended: true }));
 const indexRouter = require("./routes");
 app.use("/api", indexRouter);
 
-
-// Root redirect to /api
-app.get("/", (req, res) => {
-  console.log('yes logistics server running')
-  res.redirect("/api");
-});
-
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ message: "Not Found" });
